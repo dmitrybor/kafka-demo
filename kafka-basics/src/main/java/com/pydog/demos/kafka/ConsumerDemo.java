@@ -7,6 +7,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Properties;
 
@@ -34,7 +35,7 @@ public class ConsumerDemo {
 
         while (true) {
             LOGGER.info("Polling for new data...");
-            ConsumerRecords<String, String> consumerRecords = consumer.poll(100);
+            ConsumerRecords<String, String> consumerRecords = consumer.poll(Duration.ofMillis(100));
             consumerRecords.forEach(record ->
                     LOGGER.info("Key: {}, Value: {},\nPartition: {}, Offset: {}",
                             record.key(), record.value(), record.partition(), record.offset()
