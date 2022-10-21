@@ -48,7 +48,6 @@ public class ConsumerDemoWithShutdown {
 
         try {
             while (true) {
-                LOGGER.info("Polling for new data...");
                 ConsumerRecords<String, String> consumerRecords = consumer.poll(Duration.ofMillis(100));
                 consumerRecords.forEach(record ->
                         LOGGER.info("Key: {}, Value: {},\nPartition: {}, Offset: {}",
