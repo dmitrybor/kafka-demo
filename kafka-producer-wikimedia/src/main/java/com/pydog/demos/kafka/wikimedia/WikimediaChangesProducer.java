@@ -25,12 +25,9 @@ public class WikimediaChangesProducer {
 
         EventHandler eventHandler = new WikimediaEventHandler(recentChangesProducer, topicName);
         EventSource.Builder eventSourceBuilder = new EventSource.Builder(eventHandler, URI.create(wikimediaEventStreamUrl));
-        EventSource eventSource = eventSourceBuilder.build();
-
-        eventSource.start();
-
-        TimeUnit.SECONDS.sleep(10);
-
-        eventSource.close();
+        try (EventSource eventSource = eventSourceBuilder.build() ) {
+            eventSource.start();
+            TimeUnit.SECONDS.sleep(10);
+        }
     }
 }
