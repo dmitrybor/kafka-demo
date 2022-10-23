@@ -1,5 +1,6 @@
 package com.pydog.demos.kafka.opensearch;
 
+import com.google.gson.JsonParser;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
@@ -7,6 +8,7 @@ import org.apache.http.client.CredentialsProvider;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.DefaultConnectionKeepAliveStrategy;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -110,7 +112,9 @@ public class OpenSearchConsumer {
                                             final RestHighLevelClient openSearchClient) {
         kafkaRecords.forEach(record -> {
             IndexRequest indexRequest = new IndexRequest(openSearchIndexName)
-                    .source(record.value(), XContentType.JSON);
+                    .source(record.value(), XContentType.JSON)
+                    .id(extractId(record));
+
             try {
                 IndexResponse indexResponse = openSearchClient.index(indexRequest, RequestOptions.DEFAULT);
                 LOGGER.info("Record indexed. Document id: {}", indexResponse.getId());
@@ -120,5 +124,14 @@ public class OpenSearchConsumer {
             } catch (Exception e) {
             }
         });
+    }
+
+    private static String extractId(final ConsumerRecord<String, String> record) {
+        return JsonParser.parseString(record.value())
+                .getAsJsonObject()
+                .get("meta")
+                .getAsJsonObject()
+                .get("id")
+                .getAsString();
     }
 }
