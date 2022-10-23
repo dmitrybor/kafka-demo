@@ -12,8 +12,9 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.opensearch.action.bulk.BulkRequest;
+import org.opensearch.action.bulk.BulkResponse;
 import org.opensearch.action.index.IndexRequest;
-import org.opensearch.action.index.IndexResponse;
 import org.opensearch.client.RequestOptions;
 import org.opensearch.client.RestClient;
 import org.opensearch.client.RestClientBuilder;
@@ -50,6 +51,10 @@ public class OpenSearchConsumer {
                 ConsumerRecords<String, String> records = kafkaConsumer.poll(Duration.ofMillis(3000));
                 LOGGER.info("Received {} records", records.count());
                 indexIntoOpenSearch(records, openSearchIndexName, openSearchClient);
+                if (records.count() > 0) {
+                    kafkaConsumer.commitSync();
+                    LOGGER.info("Offsets have been committed.");
+                }
             }
         }
     }
@@ -87,6 +92,7 @@ public class OpenSearchConsumer {
         properties.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         properties.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+        properties.setProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
         return properties;
     }
 
@@ -109,25 +115,33 @@ public class OpenSearchConsumer {
 
     private static void indexIntoOpenSearch(final ConsumerRecords<String, String> kafkaRecords,
                                             final String openSearchIndexName,
-                                            final RestHighLevelClient openSearchClient) {
+                                            final RestHighLevelClient openSearchClient) throws IOException {
+        BulkRequest bulkRequest = new BulkRequest();
         kafkaRecords.forEach(record -> {
+            String messageValue = extractMessageValue(record);
             IndexRequest indexRequest = new IndexRequest(openSearchIndexName)
-                    .source(record.value(), XContentType.JSON)
-                    .id(extractId(record));
-
-            try {
-                IndexResponse indexResponse = openSearchClient.index(indexRequest, RequestOptions.DEFAULT);
-                LOGGER.info("Record indexed. Document id: {}", indexResponse.getId());
-            } catch (IOException e) {
-                LOGGER.error("Error while indexing a document (partition: {}, offset: {}) in OpenSearch",
-                        record.partition(), record.offset(), e);
-            } catch (Exception e) {
-            }
+                    .source(messageValue, XContentType.JSON)
+                    .id(extractId(messageValue));
+            bulkRequest.add(indexRequest);
         });
+        if (bulkRequest.numberOfActions() < 1) {
+            return;
+        }
+        try {
+            BulkResponse bulkResponse = openSearchClient.bulk(bulkRequest, RequestOptions.DEFAULT);
+            LOGGER.info("Indexed {} records", bulkResponse.getItems().length);
+        } catch (IOException e) {
+            LOGGER.error("Error while indexing documents into OpenSearch");
+            throw e;
+        }
     }
 
-    private static String extractId(final ConsumerRecord<String, String> record) {
-        return JsonParser.parseString(record.value())
+    private static String extractMessageValue(final ConsumerRecord<String, String> record) {
+        return record.value().replaceFirst("event: message", "");
+    }
+
+    private static String extractId(final String messageValue) {
+        return JsonParser.parseString(messageValue)
                 .getAsJsonObject()
                 .get("meta")
                 .getAsJsonObject()
