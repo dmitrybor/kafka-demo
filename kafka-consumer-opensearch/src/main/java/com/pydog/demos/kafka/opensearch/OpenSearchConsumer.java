@@ -55,6 +55,7 @@ public class OpenSearchConsumer {
                     kafkaConsumer.commitSync();
                     LOGGER.info("Offsets have been committed.");
                 }
+                sleep(1000);
             }
         }
     }
@@ -147,5 +148,13 @@ public class OpenSearchConsumer {
                 .getAsJsonObject()
                 .get("id")
                 .getAsString();
+    }
+
+    private static void sleep(final long milliseconds) {
+        try {
+            Thread.sleep(milliseconds);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
