@@ -38,7 +38,7 @@ public class WikimediaChangesProducer {
         EventSource.Builder eventSourceBuilder = new EventSource.Builder(eventHandler, URI.create(wikimediaEventStreamUrl));
         try (EventSource eventSource = eventSourceBuilder.build() ) {
             eventSource.start();
-            TimeUnit.SECONDS.sleep(10);
+            TimeUnit.MINUTES.sleep(10);
         }
     }
 }
